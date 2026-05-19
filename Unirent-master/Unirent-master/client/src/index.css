@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+@theme {
+  /* Premium Academic Palette */
+  --color-midnight-navy: #1B3B5A;
+  --color-academy-gold: #D4AF37;
+  --color-mist-gray: #F8FAFC;
+  --color-slate-gray: #64748B;
+  --color-scholar-white: #FFFFFF;
+
+  /* Radii mapping */
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+
+  /* Shadows */
+  --shadow-whisper: 0 4px 20px -5px rgba(27, 59, 90, 0.05);
+
+  --radius: 0.5rem;
+}
+
+@layer base {
+  body {
+    margin: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: var(--color-scholar-white);
+    color: #0F172A;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: var(--color-midnight-navy);
+    letter-spacing: -0.01em;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-midnight-navy text-white px-4 py-2 rounded-lg hover:opacity-90 transition-all font-medium;
+  }
+
+  .card-premium {
+    @apply bg-white rounded-2xl shadow-whisper border border-slate-100 p-6;
+  }
+
+  .shadow-whisper {
+    box-shadow: var(--shadow-whisper);
+  }
+}
