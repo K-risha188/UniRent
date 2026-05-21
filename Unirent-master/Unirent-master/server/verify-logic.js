@@ -26,7 +26,8 @@ async function verifyBackend() {
                 name: `Owner_${timestamp}`,
                 email: `owner_${timestamp}@paruluniversity.ac.in`,
                 password: 'password123',
-                university: 'Parul University'
+                university: 'Parul University',
+                idCardImage: 'id.jpg'
             })
         });
         const ownerToken = ownerData.token;
@@ -39,7 +40,8 @@ async function verifyBackend() {
                 name: `Renter_${timestamp}`,
                 email: `renter_${timestamp}@paruluniversity.ac.in`,
                 password: 'password123',
-                university: 'Parul University'
+                university: 'Parul University',
+                idCardImage: 'id.jpg'
             })
         });
         const renterToken = renterData.token;

@@ -17,6 +17,22 @@ exports.createBooking = async (req, res) => {
 
         const start = new Date(startDate);
         const end = new Date(endDate);
+
+        if (start > end) {
+            return res.status(400).json({ error: 'Start date cannot be after end date' });
+        }
+
+        // Check for overlapping approved/active bookings
+        const overlappingBooking = await Booking.findOne({
+            item: itemId,
+            status: { $in: ['approved', 'active', 'requested_return'] },
+            $or: [
+                { startDate: { $lte: end }, endDate: { $gte: start } }
+            ]
+        });
+        if (overlappingBooking) {
+            return res.status(400).json({ error: 'This item is already booked for the selected dates.' });
+        }
         const diffTime = Math.abs(end - start);
         const diffDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
         const totalPrice = diffDays * item.pricePerDay;
@@ -109,6 +125,20 @@ exports.updateBookingStatus = async (req, res) => {
 
         if (booking.owner.toString() !== req.user._id.toString()) {
             return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        if (status === 'approved') {
+            const overlappingBooking = await Booking.findOne({
+                item: booking.item,
+                _id: { $ne: booking._id },
+                status: { $in: ['approved', 'active', 'requested_return'] },
+                $or: [
+                    { startDate: { $lte: booking.endDate }, endDate: { $gte: booking.startDate } }
+                ]
+            });
+            if (overlappingBooking) {
+                return res.status(400).json({ error: 'Cannot approve this booking because the item is already booked for overlapping dates.' });
+            }
         }
 
         booking.status = status;
@@ -322,8 +352,8 @@ exports.getItemHistory = async (req, res) => {
         const history = bookings.map(b => ({
             id: b._id,
             renter: b.renter,
-            handover: b.verification.preRental,
-            return: b.verification.postRental,
+            handover: b.verification ? b.verification.preRental : null,
+            return: b.verification ? b.verification.postRental : null,
             date: b.endDate
         }));
 
@@ -332,3 +362,57 @@ exports.getItemHistory = async (req, res) => {
         res.status(400).json({ error: error.message });
     }
 };
+
+exports.cancelBooking = async (req, res) => {
+    try {
+        const booking = await Booking.findById(req.params.id);
+        if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+        // Ensure the logged-in user is indeed the renter
+        if (booking.renter.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ error: 'Only the renter can cancel this booking request' });
+        }
+
+        // Restrict unilateral cancellation to pending requests
+        if (booking.status !== 'pending') {
+            return res.status(400).json({ error: 'You can only cancel a pending booking request' });
+        }
+
+        // Transition status to cancelled
+        booking.status = 'cancelled';
+        await booking.save();
+        await booking.populate('item', 'title');
+
+        // Refund held funds: rent price + security deposit + 5% platform fee
+        const platformFee = booking.totalPrice * 0.05;
+        const refundAmount = booking.totalPrice + booking.securityDeposit + platformFee;
+
+        const renterUser = await User.findById(booking.renter);
+        renterUser.walletBalance = (renterUser.walletBalance || 0) + refundAmount;
+        await renterUser.save();
+
+        // Create transaction log
+        await Transaction.create({
+            user: booking.renter,
+            amount: refundAmount,
+            type: 'credit',
+            purpose: 'DEPOSIT_REFUND',
+            relatedBooking: booking._id,
+            description: `Refund for cancelled request: ${booking.item.title}`
+        });
+
+        // Notify the owner of the cancellation
+        await Notification.create({
+            recipient: booking.owner,
+            message: `Booking request for ${booking.item.title} was cancelled by the renter`,
+            type: 'booking',
+            relatedId: booking._id
+        });
+
+        res.json({ message: 'Booking request cancelled successfully and funds fully refunded', booking });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+};
+
+
