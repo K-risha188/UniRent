@@ -31,6 +31,7 @@ router.get('/received-bookings', authMiddleware, bookingController.getReceivedBo
 router.patch('/:id/status', authMiddleware, bookingController.updateBookingStatus);
 router.post('/:id/verify', authMiddleware, upload.array('photos', 5), bookingController.submitVerification);
 router.patch('/:id/request-return', authMiddleware, bookingController.requestReturn);
+
 router.get('/item/:itemId/history', bookingController.getItemHistory);
 
 module.exports = router;
