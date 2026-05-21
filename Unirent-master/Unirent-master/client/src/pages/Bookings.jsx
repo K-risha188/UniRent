@@ -48,6 +48,21 @@ const Bookings = () => {
         }
     };
 
+    const handleCancelBooking = async (id) => {
+        if (!window.confirm('Are you sure you want to cancel this booking request? Your held funds will be fully refunded to your wallet.')) return;
+        try {
+            const token = sessionStorage.getItem('token');
+            await axios.patch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/bookings/${id}/cancel`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setBookings(prev => prev.map(b => b._id === id ? { ...b, status: 'cancelled' } : b));
+            alert('Booking request cancelled successfully and funds fully refunded!');
+        } catch (err) {
+            console.error(err);
+            alert(err.response?.data?.error || 'Failed to cancel booking request');
+        }
+    };
+
     const handleConfirmVerification = async ({ type, notes, existingPhotos, newFiles }) => {
         const { id } = verificationConfig;
         setSubmitting(true);
@@ -197,9 +212,20 @@ const Bookings = () => {
                                             </div>
                                         )}
                                         {booking.status === 'pending' && (
-                                            <div className="flex items-center gap-2 text-indigo-400 bg-white px-6 py-3 rounded-xl border border-slate-100 shadow-sm">
-                                                <Clock size={16} />
-                                                <span className="text-[10px] font-black uppercase tracking-widest">Awaiting Peer</span>
+                                            <div className="flex items-center gap-4">
+                                                <div className="flex items-center gap-2 text-indigo-400 bg-white px-6 py-3 rounded-xl border border-slate-100 shadow-sm">
+                                                    <Clock size={16} />
+                                                    <span className="text-[10px] font-black uppercase tracking-widest">Awaiting Peer</span>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleCancelBooking(booking._id);
+                                                    }}
+                                                    className="px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-white hover:text-rose-500 transition border border-transparent hover:border-slate-200 shadow-sm bg-slate-100 font-bold"
+                                                >
+                                                    Cancel Request
+                                                </button>
                                             </div>
                                         )}
                                     </div>
