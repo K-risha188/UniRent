@@ -288,6 +288,15 @@ const OwnerDashboard = () => {
                                 <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest text-indigo-600 shadow-sm border border-white/20 italic">
                                     {item.category}
                                 </div>
+                                {item.moderationStatus === 'flagged' && (
+                                    <div className="absolute inset-0 bg-rose-950/80 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center z-10 transition-all duration-300">
+                                        <Flag className="text-rose-400 mb-2 animate-bounce" size={28} />
+                                        <span className="text-white text-xs font-black uppercase tracking-widest">Flagged by Moderation</span>
+                                        <p className="text-rose-200 text-[10px] font-bold mt-2 max-w-[200px] leading-relaxed">
+                                            {item.moderationReason || 'Inappropriate campus content detected.'}
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                             <div className="p-8">
                                 <div className="flex justify-between items-start mb-4">

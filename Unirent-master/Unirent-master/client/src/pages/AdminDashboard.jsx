@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Users, Package, BarChart3, Trash2, ShieldCheck, ShieldAlert, Search, RefreshCcw, ExternalLink, UserCheck } from 'lucide-react';
+import { Users, Package, BarChart3, Trash2, ShieldCheck, ShieldAlert, Search, RefreshCcw, ExternalLink, UserCheck, Check } from 'lucide-react';
 import VerificationModal from '../components/VerificationModal';
 
 const AdminDashboard = () => {
@@ -53,6 +53,20 @@ const AdminDashboard = () => {
             setItems(items.filter(item => item._id !== id));
         } catch (err) {
             alert('Operation failed');
+        }
+    };
+
+    const handleApproveItem = async (id) => {
+        if (!window.confirm('Approve and unflag this listing? It will become visible on the public marketplace.')) return;
+        try {
+            const token = sessionStorage.getItem('token');
+            await axios.patch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/admin/items/${id}/approve`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setItems(items.map(item => item._id === id ? { ...item, moderationStatus: 'approved' } : item));
+            alert('Listing approved successfully!');
+        } catch (err) {
+            alert('Approval operation failed');
         }
     };
 
@@ -190,6 +204,7 @@ const AdminDashboard = () => {
                                             <th className="px-8 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-gray">Asset Title</th>
                                             <th className="px-8 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-gray">Registry Owner</th>
                                             <th className="px-8 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-gray">Valuation</th>
+                                            <th className="px-8 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-gray">Safety Status</th>
                                             <th className="px-8 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-gray text-right">Actions</th>
                                         </tr>
                                     </thead>
@@ -203,10 +218,29 @@ const AdminDashboard = () => {
                                                     </div>
                                                 </td>
                                                 <td className="px-8 py-5 font-bold text-midnight-navy">₹{item.pricePerDay} <span className="text-[10px] text-slate-gray uppercase">/ Day</span></td>
-                                                <td className="px-8 py-5 text-right">
+                                                <td className="px-8 py-5">
+                                                    <span className={`px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-widest ${
+                                                        item.moderationStatus === 'flagged' 
+                                                            ? 'bg-rose-100 text-rose-800' 
+                                                            : 'bg-emerald-100 text-emerald-800'
+                                                    }`}>
+                                                        {item.moderationStatus || 'approved'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-8 py-5 text-right flex items-center justify-end gap-2">
+                                                    {item.moderationStatus === 'flagged' && (
+                                                        <button
+                                                            onClick={() => handleApproveItem(item._id)}
+                                                            className="p-2.5 text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-all shadow-sm border border-transparent hover:border-emerald-100"
+                                                            title="Approve & Unflag Item"
+                                                        >
+                                                            <Check size={18} />
+                                                        </button>
+                                                    )}
                                                     <button
                                                         onClick={() => handleDeleteItem(item._id)}
                                                         className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shadow-sm border border-transparent hover:border-rose-100"
+                                                        title="Delete Listing"
                                                     >
                                                         <Trash2 size={18} />
                                                     </button>

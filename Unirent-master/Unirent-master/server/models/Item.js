@@ -14,6 +14,8 @@ const itemSchema = new mongoose.Schema({
         endDate: { type: Date }
     }],
     isAvailable: { type: Boolean, default: true },
+    moderationStatus: { type: String, enum: ['approved', 'flagged'], default: 'approved' },
+    moderationReason: { type: String, default: '' },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });

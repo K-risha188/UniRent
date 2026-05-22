@@ -12,6 +12,7 @@ router.get('/stats', adminController.getStats);
 router.get('/users', adminController.getAllUsers);
 router.get('/items', adminController.getAllItems);
 router.delete('/items/:id', adminController.deleteItem);
+router.patch('/items/:id/approve', adminController.approveItem);
 router.patch('/users/:id/toggle-admin', adminController.toggleAdmin);
 
 // Verification routes
