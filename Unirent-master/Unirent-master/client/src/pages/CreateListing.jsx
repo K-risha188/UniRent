@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Camera, Plus, Trash } from 'lucide-react';
+import { Camera, Plus, Trash, Sparkles } from 'lucide-react';
+import AIPriceModal from '../components/AIPriceModal';
 
 const CreateListing = () => {
     const [formData, setFormData] = useState({
@@ -14,10 +15,22 @@ const CreateListing = () => {
         newFiles: []
     });
     const [loading, setLoading] = useState(false);
+    const [aiModalOpen, setAiModalOpen] = useState(false);
     const navigate = useNavigate();
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const handleApplyAI = (aiData) => {
+        setFormData({
+            ...formData,
+            title: aiData.title,
+            description: aiData.description,
+            pricePerDay: String(aiData.pricePerDay),
+            securityDeposit: String(aiData.securityDeposit),
+            category: aiData.category
+        });
     };
 
     const handleUrlAdd = () => {
@@ -66,13 +79,19 @@ const CreateListing = () => {
             });
 
             const token = sessionStorage.getItem('token');
-            await axios.post(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/items`, submitData, {
+            const res = await axios.post(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/items`, submitData, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                     'Content-Type': 'multipart/form-data'
                 }
             });
-            navigate('/rentals');
+            
+            if (res.data.moderationStatus === 'flagged') {
+                alert(`⚠️ Safety Alert:\n\nYour listing "${res.data.title}" was flagged by automated moderation for inappropriate context:\n\n"${res.data.moderationReason}"\n\nIt has been hidden from public search and is pending review by the admin team.`);
+                navigate('/dashboard');
+            } else {
+                navigate('/rentals');
+            }
         } catch (error) {
             alert('Failed to create listing');
         } finally {
@@ -81,15 +100,39 @@ const CreateListing = () => {
     };
 
     return (
-        <div className="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
-            <h1 className="text-3xl font-bold text-slate-800 mb-8">List an Item for Rent</h1>
+        <div className="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-slate-100 relative">
+            <div className="flex items-center justify-between mb-8">
+                <h1 className="text-3xl font-bold text-slate-800">List an Item for Rent</h1>
+            </div>
+
+            {/* AI Listing Helper Banner */}
+            <div className="bg-gradient-to-r from-indigo-500/10 to-purple-500/10 p-4 rounded-2xl border border-indigo-100 flex items-center justify-between mb-6 shadow-sm">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-md">
+                        <Sparkles size={18} />
+                    </div>
+                    <div>
+                        <h4 className="text-xs font-bold text-slate-800">Unsure about pricing or description?</h4>
+                        <p className="text-[10px] text-slate-500 font-medium mt-0.5">Let our intelligent AI helper write and price your listing.</p>
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => setAiModalOpen(true)}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm active:scale-95"
+                >
+                    <Sparkles size={12} />
+                    Use AI Helper
+                </button>
+            </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-2">Item Title</label>
                     <input
                         name="title" required
-                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                        value={formData.title}
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
                         placeholder="e.g. MacBook Pro M1 2021"
                         onChange={handleChange}
                     />
@@ -98,8 +141,9 @@ const CreateListing = () => {
                 <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-2">Description</label>
                     <textarea
-                        name="description" required rows="4"
-                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                        name="description" required rows="5"
+                        value={formData.description}
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
                         placeholder="Tell your peers about the item condition and what's included..."
                         onChange={handleChange}
                     ></textarea>
@@ -110,7 +154,8 @@ const CreateListing = () => {
                         <label className="block text-sm font-semibold text-slate-700 mb-2">Price per Day (₹)</label>
                         <input
                             name="pricePerDay" type="number" required
-                            className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                            value={formData.pricePerDay}
+                            className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
                             onChange={handleChange}
                         />
                     </div>
@@ -118,7 +163,8 @@ const CreateListing = () => {
                         <label className="block text-sm font-semibold text-slate-700 mb-2">Security Deposit (₹)</label>
                         <input
                             name="securityDeposit" type="number" required
-                            className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                            value={formData.securityDeposit}
+                            className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
                             onChange={handleChange}
                         />
                     </div>
@@ -128,7 +174,8 @@ const CreateListing = () => {
                     <label className="block text-sm font-semibold text-slate-700 mb-2">Category</label>
                     <select
                         name="category"
-                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                        value={formData.category}
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white"
                         onChange={handleChange}
                     >
                         <option>Electronics</option>
@@ -200,6 +247,13 @@ const CreateListing = () => {
                     {loading ? 'Creating...' : 'Publish Listing'}
                 </button>
             </form>
+
+            <AIPriceModal
+                isOpen={aiModalOpen}
+                onClose={() => setAiModalOpen(false)}
+                onApply={handleApplyAI}
+                currentData={formData}
+            />
         </div>
     );
 };

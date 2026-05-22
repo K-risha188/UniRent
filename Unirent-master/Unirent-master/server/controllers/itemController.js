@@ -1,6 +1,7 @@
 const Item = require('../models/Item');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
+const safetyModerator = require('../utils/safetyModerator');
 
 exports.createItem = async (req, res) => {
     try {
@@ -30,6 +31,8 @@ exports.createItem = async (req, res) => {
             allImages = [...allImages, ...uploadedPaths];
         }
 
+        const safety = await safetyModerator.checkSafety(title, description, category);
+
         const item = new Item({
             title,
             description,
@@ -38,21 +41,47 @@ exports.createItem = async (req, res) => {
             images: allImages,
             category,
             owner: req.user._id,
-            university: req.user.university
+            university: req.user.university,
+            moderationStatus: safety.isSafe ? 'approved' : 'flagged',
+            moderationReason: safety.isSafe ? '' : safety.reason,
+            isAvailable: safety.isSafe ? true : false
         });
 
         await item.save();
 
-        // Broadcast notification to other users
-        const users = await User.find({ _id: { $ne: req.user._id } }).select('_id');
-        const notifications = users.map(u => ({
-            recipient: u._id,
-            message: `New item added: ${item.title}`,
-            type: 'item',
-            relatedId: item._id
-        }));
-        if (notifications.length > 0) {
-            await Notification.insertMany(notifications);
+        if (!safety.isSafe) {
+            // 1. Dispatch notification to all Admins
+            const admins = await User.find({ role: 'admin' }).select('_id');
+            const adminNotifications = admins.map(admin => ({
+                recipient: admin._id,
+                message: `⚠️ Security Alert: "${item.title}" posted by ${req.user.name} was flagged for: "${safety.reason}"`,
+                type: 'system',
+                relatedId: item._id
+            }));
+            if (adminNotifications.length > 0) {
+                await Notification.insertMany(adminNotifications);
+            }
+
+            // 2. Dispatch notification to the Owner
+            const ownerNotification = new Notification({
+                recipient: req.user._id,
+                message: `⚠️ Your listing "${item.title}" was flagged by automated moderation for: "${safety.reason}". It is pending admin review.`,
+                type: 'item',
+                relatedId: item._id
+            });
+            await ownerNotification.save();
+        } else {
+            // Broadcast notification to other users
+            const users = await User.find({ _id: { $ne: req.user._id } }).select('_id');
+            const notifications = users.map(u => ({
+                recipient: u._id,
+                message: `New item added: ${item.title}`,
+                type: 'item',
+                relatedId: item._id
+            }));
+            if (notifications.length > 0) {
+                await Notification.insertMany(notifications);
+            }
         }
 
         res.status(201).json(item);
@@ -64,7 +93,7 @@ exports.createItem = async (req, res) => {
 exports.getAllItems = async (req, res) => {
     try {
         const { university, category, search } = req.query;
-        let query = { isAvailable: true };
+        let query = { isAvailable: true, moderationStatus: { $ne: 'flagged' } };
 
         if (university) query.university = university;
         if (category) query.category = category;

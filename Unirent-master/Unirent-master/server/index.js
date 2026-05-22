@@ -52,6 +52,7 @@ app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/requests', require('./routes/requestRoutes'));
 app.use('/api/wallet', require('./routes/walletRoutes'));
+app.use('/api/ai', require('./routes/aiRoutes'));
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
