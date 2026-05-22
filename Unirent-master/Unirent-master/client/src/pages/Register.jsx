@@ -1,14 +1,15 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { User, Mail, Lock, Landmark, Upload, Image as ImageIcon } from 'lucide-react';
+import { User, Mail, Lock, Landmark, Upload, Image as ImageIcon, Phone } from 'lucide-react';
 
 const Register = () => {
     const [formData, setFormData] = useState({
         name: '',
         email: '',
         password: '',
-        university: ''
+        university: '',
+        phone: ''
     });
     const [idCardImage, setIdCardImage] = useState(null);
     const [previewUrl, setPreviewUrl] = useState('');
@@ -43,6 +44,7 @@ const Register = () => {
             data.append('email', formData.email);
             data.append('password', formData.password);
             data.append('university', formData.university);
+            data.append('phone', formData.phone);
             data.append('idCardImage', idCardImage);
 
             await register(data);
@@ -103,6 +105,19 @@ const Register = () => {
                                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                             />
                             <Mail className="absolute left-4 top-3.5 text-slate-400" size={18} />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-gray mb-2 ml-1">Contact Number</label>
+                        <div className="relative">
+                            <input
+                                type="text"
+                                className="w-full px-4 py-3 bg-mist-gray border border-slate-200 rounded-lg focus:border-midnight-navy focus:bg-white outline-none transition-all pl-11"
+                                placeholder="e.g. +919876543210"
+                                value={formData.phone}
+                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                            />
+                            <Phone className="absolute left-4 top-3.5 text-slate-400" size={18} />
                         </div>
                     </div>
                     <div>

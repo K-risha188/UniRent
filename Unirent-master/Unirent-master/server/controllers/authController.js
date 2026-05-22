@@ -8,7 +8,7 @@ const secret = process.env.JWT_SECRET || 'unirent_secret_key';
 
 exports.register = async (req, res) => {
     try {
-        const { name, email, password, university } = req.body;
+        const { name, email, password, university, phone } = req.body;
 
         // University email validation is also handled by Mongoose schema but we can add a check here too
         if (!email.endsWith('@paruluniversity.ac.in')) {
@@ -21,11 +21,11 @@ exports.register = async (req, res) => {
 
         const idCardImage = req.file.path.replace(/\\/g, '/');
 
-        const user = new User({ name, email, password, university, idCardImage, isVerified: false });
+        const user = new User({ name, email, password, university, phone, idCardImage, isVerified: false });
         await user.save();
 
         const token = jwt.encode({ id: user._id }, secret);
-        res.status(201).json({ token, user: { id: user._id, name, email, university, role: user.role } });
+        res.status(201).json({ token, user: { id: user._id, name, email, university, phone: user.phone, role: user.role } });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
@@ -50,9 +50,16 @@ exports.login = async (req, res) => {
 exports.updateProfile = async (req, res) => {
     try {
         const { name, bio, image, phone, yearOfStudy, enrollmentId } = req.body;
+        const currentUser = await User.findById(req.user._id);
+
+        let phoneVerifiedState = currentUser.isPhoneVerified;
+        if (phone !== undefined && phone !== currentUser.phone) {
+            phoneVerifiedState = false;
+        }
+
         const user = await User.findByIdAndUpdate(
             req.user._id,
-            { name, bio, image, phone, yearOfStudy, enrollmentId },
+            { name, bio, image, phone, yearOfStudy, enrollmentId, isPhoneVerified: phoneVerifiedState },
             { new: true }
         ).select('-password');
         res.json(user);
@@ -60,6 +67,93 @@ exports.updateProfile = async (req, res) => {
         res.status(400).json({ error: error.message });
     }
 };
+
+exports.sendOtp = async (req, res) => {
+    try {
+        const { phone } = req.body;
+        const targetPhone = phone || req.user.phone;
+
+        if (!targetPhone) {
+            return res.status(400).json({ error: 'Please provide a valid phone number.' });
+        }
+
+        // Generate 6-digit numeric OTP
+        const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes validity
+
+        // If phone is different from user's current phone, update it and reset verification
+        const updateData = {
+            phoneOtp: otpCode,
+            phoneOtpExpiry: otpExpiry
+        };
+        if (phone && phone !== req.user.phone) {
+            updateData.phone = phone;
+            updateData.isPhoneVerified = false;
+        }
+
+        await User.findByIdAndUpdate(req.user._id, updateData);
+
+        // Simulated SMS Dispatch Log (Premium CLI container feedback)
+        console.log("\n====================================================");
+        console.log("📲  SIMULATED SMS SERVICE DISPATCH LOG");
+        console.log(`To: ${targetPhone}`);
+        console.log(`Message: Your UniRent OTP verification code is: ${otpCode}`);
+        console.log("====================================================\n");
+
+        res.status(200).json({
+            success: true,
+            message: 'OTP sent successfully! (Simulated)',
+            otp: otpCode // Returned for painless local development testing
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+};
+
+exports.verifyOtp = async (req, res) => {
+    try {
+        const { otp } = req.body;
+
+        if (!otp) {
+            return res.status(400).json({ error: 'Please enter the 6-digit OTP code.' });
+        }
+
+        const user = await User.findById(req.user._id);
+
+        if (!user.phoneOtp || !user.phoneOtpExpiry) {
+            return res.status(400).json({ error: 'No OTP requested or OTP has expired. Please request a new one.' });
+        }
+
+        // Check expiry
+        if (new Date() > new Date(user.phoneOtpExpiry)) {
+            return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
+        }
+
+        // Verify match
+        if (user.phoneOtp !== otp) {
+            return res.status(400).json({ error: 'Incorrect OTP. Please check the code and try again.' });
+        }
+
+        // OTP matched successfully! Mark verified.
+        user.isPhoneVerified = true;
+        user.phoneOtp = null;
+        user.phoneOtpExpiry = null;
+        await user.save();
+
+        // Strip password for response
+        const userResponse = user.toObject();
+        delete userResponse.password;
+
+        res.status(200).json({
+            success: true,
+            message: 'Phone number verified successfully!',
+            user: userResponse
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+};
+
 
 exports.getMe = async (req, res) => {
     try {
