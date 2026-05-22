@@ -32,5 +32,7 @@ router.get('/activity', authMiddleware, authController.getUserActivity);
 router.put('/update-profile', authMiddleware, authController.updateProfile);
 router.put('/upload-id-card', authMiddleware, upload.single('idCardImage'), authController.uploadIdCard);
 router.put('/upload-profile-image', authMiddleware, upload.single('image'), authController.uploadProfileImage);
+router.post('/send-otp', authMiddleware, authController.sendOtp);
+router.post('/verify-otp', authMiddleware, authController.verifyOtp);
 
 module.exports = router;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { User as UserIcon, Shield, MapPin, Package, Heart, Leaf, Settings as SettingsIcon, Camera, ChevronDown } from 'lucide-react';
+import { User as UserIcon, Shield, MapPin, Package, Heart, Leaf, Settings as SettingsIcon, Camera, ChevronDown, Phone, Check, AlertCircle, Smartphone, Key } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Profile = () => {
@@ -21,6 +21,77 @@ const Profile = () => {
     const [uploadingId, setUploadingId] = useState(false);
     const [uploadingProfile, setUploadingProfile] = useState(false);
     const [isActivityOpen, setIsActivityOpen] = useState(true);
+
+    const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
+    const [otpCode, setOtpCode] = useState('');
+    const [otpSent, setOtpSent] = useState(false);
+    const [otpLoading, setOtpLoading] = useState(false);
+    const [otpError, setOtpError] = useState('');
+    const [timer, setTimer] = useState(0);
+    const [simulatedOtp, setSimulatedOtp] = useState('');
+
+    useEffect(() => {
+        let interval = null;
+        if (timer > 0) {
+            interval = setInterval(() => {
+                setTimer((prevTimer) => prevTimer - 1);
+            }, 1000);
+        } else {
+            clearInterval(interval);
+        }
+        return () => clearInterval(interval);
+    }, [timer]);
+
+    const handleSendOtp = async (phoneInput) => {
+        try {
+            setOtpLoading(true);
+            setOtpError('');
+            const token = sessionStorage.getItem('token');
+            const res = await axios.post(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/auth/send-otp`, 
+                { phone: phoneInput || formData.phone }, 
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setOtpSent(true);
+            setIsOtpModalOpen(true);
+            setTimer(30);
+            if (res.data.otp) {
+                setSimulatedOtp(res.data.otp);
+            }
+            setMessage('Verification OTP code dispatched!');
+            setTimeout(() => setMessage(''), 3000);
+        } catch (err) {
+            console.error(err);
+            setOtpError(err.response?.data?.error || 'Failed to dispatch verification OTP.');
+        } finally {
+            setOtpLoading(false);
+        }
+    };
+
+    const handleVerifyOtp = async (e) => {
+        e.preventDefault();
+        try {
+            setOtpLoading(true);
+            setOtpError('');
+            const token = sessionStorage.getItem('token');
+            const res = await axios.post(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/auth/verify-otp`, 
+                { otp: otpCode }, 
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setProfileData(res.data.user);
+            setFormData(prev => ({ ...prev, phone: res.data.user.phone }));
+            setIsOtpModalOpen(false);
+            setOtpSent(false);
+            setOtpCode('');
+            setMessage('Phone number verified successfully!');
+            setTimeout(() => setMessage(''), 3000);
+        } catch (err) {
+            console.error(err);
+            setOtpError(err.response?.data?.error || 'Invalid OTP code.');
+        } finally {
+            setOtpLoading(false);
+        }
+    };
+
 
     const handleIdUpload = async (e) => {
         const file = e.target.files[0];
@@ -164,11 +235,16 @@ const Profile = () => {
                     </div>
 
                     <div className="text-center md:text-left flex-1">
-                        <div className="flex items-center gap-3 justify-center md:justify-start">
+                        <div className="flex items-center flex-wrap gap-3 justify-center md:justify-start">
                             <h1 className="text-3xl font-black text-slate-900 tracking-tight italic">{profileData?.name}</h1>
                             <span className="bg-indigo-100 text-indigo-600 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border border-indigo-200">
                                 Verified Peer
                             </span>
+                            {profileData?.isPhoneVerified && (
+                                <span className="bg-emerald-100 text-emerald-600 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border border-emerald-200 flex items-center gap-1 animate-pulse">
+                                    <Smartphone size={10} /> Phone Verified
+                                </span>
+                            )}
                         </div>
                         <div className="flex flex-wrap items-center gap-4 mt-3 justify-center md:justify-start">
                             <span className="flex items-center gap-1.5 text-xs font-bold text-slate-400 uppercase tracking-widest italic">
@@ -342,6 +418,7 @@ const Profile = () => {
                     <h2 className="text-xl font-black text-slate-800 tracking-tight uppercase italic px-2">Privacy & Setup</h2>
                     <div className="bg-indigo-600 rounded-[2rem] p-6 text-white shadow-lg shadow-indigo-100">
                         <h4 className="font-black text-sm uppercase tracking-widest mb-4 italic">Verification Status</h4>
+                        
                         <div className="flex items-center gap-3 bg-white/10 p-4 rounded-2xl backdrop-blur-md mb-4 border border-white/10">
                             <Shield size={24} className="text-indigo-200" />
                             <div>
@@ -349,6 +426,39 @@ const Profile = () => {
                                 <p className="text-xs font-bold italic">{profileData?.email}</p>
                             </div>
                         </div>
+
+                        {/* Contact Phone Verification Block */}
+                        <div className="flex items-center justify-between bg-white/10 p-4 rounded-2xl backdrop-blur-md mb-4 border border-white/10">
+                            <div className="flex items-center gap-3">
+                                <Phone size={24} className="text-indigo-200" />
+                                <div>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-100 mb-0.5">Contact Number</p>
+                                    <p className="text-xs font-bold italic">{profileData?.phone || "Not set in settings"}</p>
+                                </div>
+                            </div>
+                            {profileData?.phone ? (
+                                profileData.isPhoneVerified ? (
+                                    <span className="flex items-center gap-1 text-[9px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-1 rounded-full uppercase tracking-wider">
+                                        <Check size={10} /> Verified
+                                    </span>
+                                ) : (
+                                    <button
+                                        onClick={() => handleSendOtp(profileData.phone)}
+                                        className="text-[9px] font-black bg-white text-indigo-600 hover:bg-slate-50 px-2.5 py-1.5 rounded-lg uppercase tracking-wider transition active:scale-95 shadow-md"
+                                    >
+                                        Verify
+                                    </button>
+                                )
+                            ) : (
+                                <button
+                                    onClick={() => setIsEditing(true)}
+                                    className="text-[9px] font-black bg-white/20 text-white hover:bg-white/30 px-2.5 py-1.5 rounded-lg uppercase tracking-wider transition active:scale-95 border border-white/10"
+                                >
+                                    Set Number
+                                </button>
+                            )}
+                        </div>
+
                         <p className="text-[10px] font-bold opacity-70 italic leading-relaxed mb-4">
                             {profileData?.isVerified ? `Your account is verified at ${profileData?.university}. Only verified peers can see your full listings.` : `Your account is pending verification. Please upload your student ID to verify your profile.`}
                         </p>
@@ -378,6 +488,116 @@ const Profile = () => {
                     </div>
                 </div>
             </div>
+
+            {/* OTP Verification Modal */}
+            {isOtpModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-[2.5rem] w-full max-w-md overflow-hidden shadow-2xl border border-slate-100 animate-in zoom-in duration-300">
+                        <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+                            <div>
+                                <h3 className="text-2xl font-black text-slate-900 italic tracking-tight flex items-center gap-2">
+                                    <Smartphone className="text-indigo-600 animate-bounce" size={24} /> Verify Phone
+                                </h3>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Confirm your contact number</p>
+                            </div>
+                            <button 
+                                onClick={() => {
+                                    setIsOtpModalOpen(false);
+                                    setOtpCode('');
+                                    setOtpError('');
+                                }} 
+                                className="text-slate-400 hover:text-slate-900 font-black uppercase tracking-widest text-[10px]"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleVerifyOtp} className="p-8 space-y-6">
+                            <div className="text-center space-y-2">
+                                <p className="text-sm font-medium text-slate-500">
+                                    We sent a 6-digit verification code to
+                                </p>
+                                <p className="text-base font-black text-indigo-600 tracking-wide italic">
+                                    {profileData?.phone}
+                                </p>
+                            </div>
+
+                            {/* Simulated OTP display for Dev Mode */}
+                            {simulatedOtp && (
+                                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-left space-y-1">
+                                    <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest flex items-center gap-1">
+                                        <AlertCircle size={10} /> Dev Mode - Simulated SMS
+                                    </p>
+                                    <p className="text-xs text-amber-800 font-bold">
+                                        The OTP generated by server is: <span className="font-mono bg-amber-100 px-2 py-0.5 rounded text-amber-900 text-sm tracking-widest select-all">{simulatedOtp}</span>
+                                    </p>
+                                </div>
+                            )}
+
+                            {otpError && (
+                                <div className="bg-rose-50 border border-rose-100 text-rose-600 text-xs font-bold p-4 rounded-2xl flex items-center gap-2">
+                                    <AlertCircle size={16} className="shrink-0 animate-shake" />
+                                    <span>{otpError}</span>
+                                </div>
+                            )}
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center block">Enter 6-Digit OTP</label>
+                                <input
+                                    type="text"
+                                    maxLength={6}
+                                    pattern="\d{6}"
+                                    required
+                                    className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-center text-2xl font-mono font-black tracking-[0.5em] focus:ring-2 focus:ring-indigo-500 transition shadow-inner select-all"
+                                    placeholder="000000"
+                                    value={otpCode}
+                                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-between text-xs px-2">
+                                <span className="text-slate-400 font-bold italic">
+                                    {timer > 0 ? (
+                                        <span className="flex items-center gap-1.5">
+                                            <span className="w-2 h-2 rounded-full bg-indigo-500 animate-ping" />
+                                            Expires in {timer}s
+                                        </span>
+                                    ) : (
+                                        <span className="text-rose-500 font-black flex items-center gap-1">
+                                            <AlertCircle size={12} /> Expired
+                                        </span>
+                                    )}
+                                </span>
+                                <button
+                                    type="button"
+                                    disabled={timer > 0 || otpLoading}
+                                    onClick={() => handleSendOtp(profileData?.phone)}
+                                    className={`font-black uppercase tracking-widest text-[10px] transition ${
+                                        timer > 0 
+                                            ? 'text-slate-300 cursor-not-allowed' 
+                                            : 'text-indigo-600 hover:text-indigo-800 hover:underline active:scale-95'
+                                    }`}
+                                >
+                                    Resend Code
+                                </button>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={otpLoading || otpCode.length !== 6}
+                                className={`w-full text-white rounded-2xl py-5 font-black uppercase tracking-[0.2em] text-xs transition shadow-lg flex items-center justify-center gap-2 ${
+                                    otpCode.length !== 6 || otpLoading
+                                        ? 'bg-slate-300 shadow-none cursor-not-allowed'
+                                        : 'bg-slate-900 hover:bg-indigo-600 hover:scale-[1.01] active:scale-95'
+                                }`}
+                            >
+                                <Key size={14} />
+                                {otpLoading ? 'Verifying OTP...' : 'Verify & Activate'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
