@@ -1,6 +1,18 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
+/**
+ * @typedef {Object} UserSchema
+ * @property {String} name - Full display name of the university student
+ * @property {String} email - Validated @paruluniversity.ac.in domain email address
+ * @property {String} password - BCrypt-encrypted hash password string
+ * @property {String} role - Student permissions rank (student / admin)
+ * @property {String} phone - Contact mobile number string
+ * @property {Boolean} isPhoneVerified - Verification flag for active 2FA OTP security
+ * @property {Number} otpAttempts - Current continuous failed verification attempt counts
+ * @property {Boolean} isVerified - Administrative validation flag for physical ID card image upload
+ * @property {Number} walletBalance - Active digital currency balance for marketplace transactions
+ */
 const userSchema = new mongoose.Schema({
     name: { type: String, required: true },
     email: {
