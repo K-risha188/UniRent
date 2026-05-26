@@ -5,6 +5,14 @@ const safetyModerator = require('../utils/safetyModerator');
 
 exports.createItem = async (req, res) => {
     try {
+        // Enforce phone OTP and Admin verification guards
+        if (!req.user.isPhoneVerified) {
+            return res.status(403).json({ error: 'Please verify your phone number via OTP in your Profile before listing items.' });
+        }
+        if (!req.user.isVerified) {
+            return res.status(403).json({ error: 'Your student account is pending administrator verification. Please upload your student ID card in your Profile.' });
+        }
+
         const { title, description, pricePerDay, securityDeposit, category } = req.body;
 
         let allImages = [];
@@ -130,7 +138,47 @@ exports.updateItem = async (req, res) => {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
-        const updatedItem = await Item.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        // ============================================================
+        // SECURITY FIX: Whitelist only safe, user-editable fields.
+        // Prevents mass-assignment — users cannot directly write to
+        // moderationStatus, isAvailable, owner, or any other field.
+        // ============================================================
+        const { title, description, pricePerDay, securityDeposit, category } = req.body;
+        const updateData = {};
+        if (title !== undefined)          updateData.title          = title;
+        if (description !== undefined)    updateData.description    = description;
+        if (pricePerDay !== undefined)    updateData.pricePerDay    = pricePerDay;
+        if (securityDeposit !== undefined) updateData.securityDeposit = securityDeposit;
+        if (category !== undefined)       updateData.category       = category;
+
+        // If the user is changing title or description, re-run safety moderation.
+        const contentChanged = title || description;
+        if (contentChanged) {
+            const newTitle = title || item.title;
+            const newDesc  = description || item.description;
+            const newCat   = category || item.category;
+
+            const safety = await safetyModerator.checkSafety(newTitle, newDesc, newCat);
+            updateData.moderationStatus = safety.isSafe ? 'approved' : 'flagged';
+            updateData.moderationReason = safety.isSafe ? '' : safety.reason;
+            updateData.isAvailable      = safety.isSafe ? true : false;
+
+            if (!safety.isSafe) {
+                // Notify admins of re-flagged listing
+                const admins = await User.find({ role: 'admin' }).select('_id');
+                const adminNotifications = admins.map(admin => ({
+                    recipient: admin._id,
+                    message: `⚠️ Security Alert: Updated listing "${newTitle}" by ${req.user.name} was re-flagged for: "${safety.reason}"`,
+                    type: 'system',
+                    relatedId: item._id
+                }));
+                if (adminNotifications.length > 0) {
+                    await Notification.insertMany(adminNotifications);
+                }
+            }
+        }
+
+        const updatedItem = await Item.findByIdAndUpdate(req.params.id, updateData, { new: true });
         res.json(updatedItem);
     } catch (error) {
         res.status(400).json({ error: error.message });

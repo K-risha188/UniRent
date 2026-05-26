@@ -5,6 +5,18 @@ const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 
+// ============================================================
+// SECURITY GUARD: Fail fast if critical env vars are missing.
+// A hardcoded fallback secret is a critical vulnerability that
+// allows an attacker to forge arbitrary JWT tokens.
+// ============================================================
+if (!process.env.JWT_SECRET) {
+    console.error('\n❌  FATAL SECURITY ERROR: JWT_SECRET environment variable is not set.');
+    console.error('    Please add JWT_SECRET to your server/.env file before starting.');
+    console.error('    Example: JWT_SECRET=your_very_long_random_secret_here\n');
+    process.exit(1);
+}
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
