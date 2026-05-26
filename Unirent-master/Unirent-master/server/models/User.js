@@ -24,6 +24,7 @@ const userSchema = new mongoose.Schema({
     isPhoneVerified: { type: Boolean, default: false },
     phoneOtp: { type: String, default: null },
     phoneOtpExpiry: { type: Date, default: null },
+    otpAttempts: { type: Number, default: 0 },
     yearOfStudy: { type: String, default: '' },
     enrollmentId: { type: String, default: '' },
     idCardImage: { type: String, required: true },

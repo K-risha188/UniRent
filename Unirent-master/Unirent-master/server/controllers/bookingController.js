@@ -6,6 +6,14 @@ const Transaction = require('../models/Transaction');
 
 exports.createBooking = async (req, res) => {
     try {
+        // Enforce phone OTP and Admin verification guards
+        if (!req.user.isPhoneVerified) {
+            return res.status(403).json({ error: 'Please verify your phone number via OTP in your Profile before renting items.' });
+        }
+        if (!req.user.isVerified) {
+            return res.status(403).json({ error: 'Your student account is pending administrator verification. Please upload your student ID card in your Profile.' });
+        }
+
         const { itemId, startDate, endDate } = req.body;
 
         const item = await Item.findById(itemId);

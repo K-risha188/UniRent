@@ -15,11 +15,12 @@ import AdminDashboard from './pages/AdminDashboard';
 import Profile from './pages/Profile';
 import CommunityRequests from './pages/CommunityRequests';
 import Wallet from './pages/Wallet';
+import AIAssistantBubble from './components/AIAssistantBubble';
 
 function App() {
     return (
         <Router>
-            <div className="min-h-screen bg-slate-50">
+            <div className="min-h-screen bg-slate-50 relative">
                 <Navbar />
                 <main className="container mx-auto px-4 py-8">
                     <Routes>
@@ -39,6 +40,7 @@ function App() {
                         <Route path="/wallet" element={<Wallet />} />
                     </Routes>
                 </main>
+                <AIAssistantBubble />
             </div>
         </Router>
     );
