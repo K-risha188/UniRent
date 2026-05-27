@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Camera, Plus, Trash, Sparkles } from 'lucide-react';
@@ -16,7 +16,60 @@ const CreateListing = () => {
     });
     const [loading, setLoading] = useState(false);
     const [aiModalOpen, setAiModalOpen] = useState(false);
+    
+    // Camera State
+    const [isCameraOpen, setIsCameraOpen] = useState(false);
+    const videoRef = useRef(null);
+    const streamRef = useRef(null);
+    
     const navigate = useNavigate();
+
+    const startCamera = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            streamRef.current = stream;
+            // The video ref might not be available immediately because the modal needs to render first.
+            // We set state to open the modal, then assign the stream in a timeout or effect.
+            setIsCameraOpen(true);
+            setTimeout(() => {
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                }
+            }, 100);
+        } catch (err) {
+            console.error("Error accessing camera:", err);
+            alert("Could not access camera. Please check your browser permissions.");
+        }
+    };
+
+    const stopCamera = () => {
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach(track => track.stop());
+            streamRef.current = null;
+        }
+        setIsCameraOpen(false);
+    };
+
+    const capturePhoto = () => {
+        if (videoRef.current) {
+            const canvas = document.createElement('canvas');
+            canvas.width = videoRef.current.videoWidth;
+            canvas.height = videoRef.current.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+            
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    const file = new File([blob], `camera_capture_${Date.now()}.jpg`, { type: 'image/jpeg' });
+                    setFormData(prev => ({
+                        ...prev,
+                        newFiles: [...prev.newFiles, file]
+                    }));
+                    stopCamera();
+                }
+            }, 'image/jpeg', 0.8);
+        }
+    };
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -228,6 +281,15 @@ const CreateListing = () => {
                                 <input type="file" multiple accept="image/*" onChange={handleFileAdd} className="hidden" />
                             </label>
 
+                            <button 
+                                type="button"
+                                onClick={startCamera}
+                                className="w-24 h-24 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:border-indigo-500 hover:text-indigo-500 transition cursor-pointer"
+                            >
+                                <Camera size={24} />
+                                <span className="text-[10px] font-bold mt-1 uppercase text-center">Take<br />Photo</span>
+                            </button>
+
                             <button
                                 type="button"
                                 onClick={handleUrlAdd}
@@ -247,6 +309,39 @@ const CreateListing = () => {
                     {loading ? 'Creating...' : 'Publish Listing'}
                 </button>
             </form>
+
+            {/* WebRTC Camera Modal */}
+            {isCameraOpen && (
+                <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white p-6 rounded-[2rem] max-w-lg w-full flex flex-col items-center shadow-2xl animate-in zoom-in duration-300">
+                        <div className="w-full flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                                <Camera className="text-indigo-600" size={24} /> 
+                                Live Camera
+                            </h3>
+                            <button onClick={stopCamera} className="text-slate-400 hover:text-rose-500 font-black uppercase tracking-widest text-[10px] transition">
+                                Close
+                            </button>
+                        </div>
+                        <div className="w-full bg-slate-900 rounded-2xl overflow-hidden aspect-video relative flex items-center justify-center border-4 border-slate-100 shadow-inner">
+                            <video 
+                                ref={videoRef} 
+                                autoPlay 
+                                playsInline 
+                                className="w-full h-full object-cover scale-x-[-1]"
+                            ></video>
+                        </div>
+                        <button 
+                            type="button" 
+                            onClick={capturePhoto}
+                            className="mt-8 bg-indigo-600 hover:bg-indigo-700 hover:scale-[1.02] active:scale-95 text-white font-black uppercase tracking-widest text-xs px-10 py-4 rounded-2xl flex items-center gap-3 transition shadow-lg shadow-indigo-200"
+                        >
+                            <Camera size={18} className="animate-pulse" />
+                            Capture Image
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <AIPriceModal
                 isOpen={aiModalOpen}
