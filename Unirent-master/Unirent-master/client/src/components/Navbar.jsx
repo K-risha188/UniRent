@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Search, ShoppingCart, User, MessageSquare, LogOut, Package, ShieldCheck, Bell, Megaphone, Wallet } from 'lucide-react';
+import { Search, ShoppingCart, User, MessageSquare, LogOut, Package, ShieldCheck, Bell, Megaphone, Wallet, Home } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Navbar = () => {
@@ -97,6 +97,10 @@ const Navbar = () => {
                 </div>
 
                 <div className="flex items-center gap-6 text-white/80 font-medium">
+                    <Link to="/" className="hover:text-academy-gold transition flex items-center gap-1 group">
+                        <Home size={16} className="text-academy-gold/80 group-hover:text-academy-gold transition" />
+                        <span className="hidden lg:inline text-[10px] font-bold uppercase tracking-widest mt-0.5">Home</span>
+                    </Link>
                     <Link to="/rentals" className="hover:text-academy-gold transition">Browse</Link>
                     <Link to="/community-requests" className="hover:text-academy-gold transition flex items-center gap-1 group">
                         <Megaphone size={16} className="text-academy-gold/80 group-hover:text-academy-gold transition" />
