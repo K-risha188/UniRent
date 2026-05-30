@@ -5,12 +5,14 @@ const safetyModerator = require('../utils/safetyModerator');
 
 exports.createItem = async (req, res) => {
     try {
-        // Enforce phone OTP and Admin verification guards
-        if (!req.user.isPhoneVerified) {
-            return res.status(403).json({ error: 'Please verify your phone number via OTP in your Profile before listing items.' });
-        }
-        if (!req.user.isVerified) {
-            return res.status(403).json({ error: 'Your student account is pending administrator verification. Please upload your student ID card in your Profile.' });
+        // Enforce phone OTP and Admin verification guards (Admins bypass these checks)
+        if (req.user.role !== 'admin') {
+            if (!req.user.isPhoneVerified) {
+                return res.status(403).json({ error: 'Please verify your phone number via OTP in your Profile before listing items.' });
+            }
+            if (!req.user.isVerified) {
+                return res.status(403).json({ error: 'Your student account is pending administrator verification. Please upload your student ID card in your Profile.' });
+            }
         }
 
         const { title, description, pricePerDay, securityDeposit, category } = req.body;

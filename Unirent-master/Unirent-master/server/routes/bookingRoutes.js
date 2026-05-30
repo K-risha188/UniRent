@@ -79,4 +79,10 @@ router.patch('/:id/cancel', authMiddleware, bookingController.cancelBooking);
  */
 router.get('/item/:itemId/history', bookingController.getItemHistory);
 
+/**
+ * @route GET /api/bookings/item/:itemId/reserved-dates
+ * @desc Get all approved/active booking periods for a specific gear item
+ */
+router.get('/item/:itemId/reserved-dates', bookingController.getReservedDates);
+
 module.exports = router;

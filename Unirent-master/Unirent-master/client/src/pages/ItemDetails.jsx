@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Shield, MapPin, MessageSquare, Calendar as CalendarIcon, Wallet, Star, Clock, Info } from 'lucide-react';
+import { Shield, MapPin, MessageSquare, Calendar as CalendarIcon, Wallet, Star, Clock, Info, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getImageUrl } from '../utils/imageUtils';
 
@@ -12,12 +12,142 @@ const ItemDetails = () => {
     const [item, setItem] = useState(null);
     const [reviews, setReviews] = useState([]);
     const [history, setHistory] = useState([]);
+    const [reservedDates, setReservedDates] = useState([]);
     const [loading, setLoading] = useState(true);
     const [bookingData, setBookingData] = useState({
         startDate: '',
         endDate: ''
     });
     const [invoice, setInvoice] = useState(null);
+
+    // Calendar UI State
+    const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+    const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+
+    const monthNames = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    ];
+
+    const formatDateString = (year, month, day) => {
+        const mm = String(month + 1).padStart(2, '0');
+        const dd = String(day).padStart(2, '0');
+        return `${year}-${mm}-${dd}`;
+    };
+
+    const isDateReserved = (dateStr) => {
+        const target = new Date(dateStr + 'T00:00:00');
+        return reservedDates.some(range => {
+            const start = new Date(range.startDate.split('T')[0] + 'T00:00:00');
+            const end = new Date(range.endDate.split('T')[0] + 'T00:00:00');
+            return target >= start && target <= end;
+        });
+    };
+
+    const isRangeOverlapping = (startStr, endStr) => {
+        const start = new Date(startStr + 'T00:00:00');
+        const end = new Date(endStr + 'T00:00:00');
+        let current = new Date(start);
+        while (current <= end) {
+            const str = formatDateString(current.getFullYear(), current.getMonth(), current.getDate());
+            if (isDateReserved(str)) return true;
+            current.setDate(current.getDate() + 1);
+        }
+        return false;
+    };
+
+    const handleDateClick = (day) => {
+        const dateStr = formatDateString(currentYear, currentMonth, day);
+        
+        if (!bookingData.startDate || (bookingData.startDate && bookingData.endDate)) {
+            setBookingData({ startDate: dateStr, endDate: '' });
+        } else {
+            if (dateStr < bookingData.startDate) {
+                setBookingData({ startDate: dateStr, endDate: '' });
+            } else {
+                if (isRangeOverlapping(bookingData.startDate, dateStr)) {
+                    alert("⚠️ Scheduling conflict: Selected range overlaps with an active reservation. Please choose another period.");
+                    setBookingData({ startDate: dateStr, endDate: '' });
+                } else {
+                    setBookingData({ ...bookingData, endDate: dateStr });
+                }
+            }
+        }
+    };
+
+    const handlePrevMonth = () => {
+        if (currentMonth === 0) {
+            setCurrentMonth(11);
+            setCurrentYear(prev => prev - 1);
+        } else {
+            setCurrentMonth(prev => prev - 1);
+        }
+    };
+
+    const handleNextMonth = () => {
+        if (currentMonth === 11) {
+            setCurrentMonth(0);
+            setCurrentYear(prev => prev + 1);
+        } else {
+            setCurrentMonth(prev => prev + 1);
+        }
+    };
+
+    const renderCalendarGrid = () => {
+        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+        const startDayOfWeek = new Date(currentYear, currentMonth, 1).getDay();
+        const todayStr = formatDateString(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+
+        const grid = [];
+        
+        for (let i = 0; i < startDayOfWeek; i++) {
+            grid.push(<div key={`empty-${i}`} className="aspect-square"></div>);
+        }
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = formatDateString(currentYear, currentMonth, day);
+            const isReserved = isDateReserved(dateStr);
+            const isPast = dateStr < todayStr;
+            const isSelectedStart = bookingData.startDate === dateStr;
+            const isSelectedEnd = bookingData.endDate === dateStr;
+            const isInRange = bookingData.startDate && bookingData.endDate && dateStr > bookingData.startDate && dateStr < bookingData.endDate;
+
+            let cellClass = "aspect-square flex items-center justify-center text-xs font-bold rounded-xl border transition-all select-none ";
+            let clickHandler = () => handleDateClick(day);
+
+            if (isPast) {
+                cellClass += "bg-slate-100/50 text-slate-300 border-transparent cursor-not-allowed";
+                clickHandler = null;
+            } else if (isReserved) {
+                cellClass += "bg-amber-50 border-amber-200/50 text-amber-600 line-through cursor-not-allowed font-extrabold relative overflow-hidden";
+                clickHandler = null;
+            } else if (isSelectedStart || isSelectedEnd) {
+                cellClass += "bg-midnight-navy text-white border-midnight-navy shadow-md font-black scale-105 z-10 hover:brightness-110";
+            } else if (isInRange) {
+                cellClass += "bg-midnight-navy/10 text-midnight-navy border-midnight-navy/20 font-black hover:bg-midnight-navy/20";
+            } else {
+                cellClass += "bg-slate-50 border-slate-200/40 text-slate-700 hover:border-midnight-navy hover:bg-white hover:text-midnight-navy cursor-pointer";
+            }
+
+            grid.push(
+                <button
+                    key={day}
+                    type="button"
+                    onClick={clickHandler}
+                    disabled={isPast || isReserved}
+                    className={cellClass}
+                    title={isReserved ? "Reserved" : undefined}
+                >
+                    {day}
+                    {isReserved && (
+                        <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/0 via-amber-500/10 to-amber-500/0 rotate-45 scale-[2] pointer-events-none" />
+                    )}
+                </button>
+            );
+        }
+
+        return grid;
+    };
 
     useEffect(() => {
         if (bookingData.startDate && bookingData.endDate && item) {
@@ -52,12 +182,14 @@ const ItemDetails = () => {
                 const res = await axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/items/${id}`);
                 setItem(res.data);
 
-                const [reviewRes, historyRes] = await Promise.all([
+                const [reviewRes, historyRes, reservedRes] = await Promise.all([
                     axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/reviews/${id}`),
-                    axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/bookings/item/${id}/history`)
+                    axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/bookings/item/${id}/history`),
+                    axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/bookings/item/${id}/reserved-dates`)
                 ]);
                 setReviews(reviewRes.data);
                 setHistory(historyRes.data);
+                setReservedDates(reservedRes.data);
             } catch (err) {
                 console.error(err);
             } finally {
@@ -171,22 +303,83 @@ const ItemDetails = () => {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-6">
-                            <div className="space-y-2.5">
-                                <label className="text-[10px] font-bold text-slate-gray uppercase tracking-widest ml-1">Commencement</label>
-                                <input
-                                    type="date"
-                                    className="w-full bg-mist-gray border-none rounded-xl py-4 px-5 focus:ring-2 focus:ring-midnight-navy outline-none text-sm font-bold text-midnight-navy"
-                                    onChange={(e) => setBookingData({ ...bookingData, startDate: e.target.value })}
-                                />
+                        <div className="grid grid-cols-2 gap-6 border-b border-slate-100 pb-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-gray uppercase tracking-widest ml-1">Commencement</label>
+                                <div className="w-full bg-mist-gray rounded-xl py-3.5 px-5 text-xs font-bold text-midnight-navy border border-slate-200/50 flex items-center gap-2 select-none">
+                                    <CalendarIcon size={14} className="text-slate-400" />
+                                    <span>{bookingData.startDate ? new Date(bookingData.startDate).toLocaleDateString(undefined, { dateStyle: 'medium' }) : "Select below..."}</span>
+                                </div>
                             </div>
-                            <div className="space-y-2.5">
-                                <label className="text-[10px] font-bold text-slate-gray uppercase tracking-widest ml-1">Termination</label>
-                                <input
-                                    type="date"
-                                    className="w-full bg-mist-gray border-none rounded-xl py-4 px-5 focus:ring-2 focus:ring-midnight-navy outline-none text-sm font-bold text-midnight-navy"
-                                    onChange={(e) => setBookingData({ ...bookingData, endDate: e.target.value })}
-                                />
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-gray uppercase tracking-widest ml-1">Termination</label>
+                                <div className="w-full bg-mist-gray rounded-xl py-3.5 px-5 text-xs font-bold text-midnight-navy border border-slate-200/50 flex items-center gap-2 select-none">
+                                    <CalendarIcon size={14} className="text-slate-400" />
+                                    <span>{bookingData.endDate ? new Date(bookingData.endDate).toLocaleDateString(undefined, { dateStyle: 'medium' }) : "Select below..."}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Premium Visual Booking Calendar */}
+                        <div className="bg-white border border-slate-200/60 rounded-[2rem] p-6 shadow-sm space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <CalendarIcon size={16} className="text-academy-gold" />
+                                    <h4 className="text-xs font-black uppercase tracking-wider text-midnight-navy">Availability Calendar</h4>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={handlePrevMonth}
+                                        className="p-2 hover:bg-slate-100 rounded-xl transition text-slate-500 hover:text-midnight-navy cursor-pointer"
+                                    >
+                                        <ChevronLeft size={16} />
+                                    </button>
+                                    <span className="text-xs font-black uppercase tracking-widest text-midnight-navy w-28 text-center select-none">
+                                        {monthNames[currentMonth]} {currentYear}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={handleNextMonth}
+                                        className="p-2 hover:bg-slate-100 rounded-xl transition text-slate-500 hover:text-midnight-navy cursor-pointer"
+                                    >
+                                        <ChevronRight size={16} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-7 text-center border-b border-slate-100 pb-2">
+                                {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day, idx) => (
+                                    <span key={idx} className="text-[10px] font-black text-slate-gray uppercase tracking-widest">{day}</span>
+                                ))}
+                            </div>
+
+                            <div className="grid grid-cols-7 gap-2">
+                                {renderCalendarGrid()}
+                            </div>
+
+                            <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-wider text-slate-400 pt-2 border-t border-slate-100/50 select-none">
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-2.5 h-2.5 bg-slate-50 border border-slate-200/50 rounded-sm" />
+                                    <span>Available</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-2.5 h-2.5 bg-amber-50 border border-amber-200/50 text-amber-600 rounded-sm flex items-center justify-center line-through font-bold text-[6px]">X</div>
+                                    <span>Booked Peer</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-2.5 h-2.5 bg-midnight-navy rounded-sm" />
+                                    <span>Your Range</span>
+                                </div>
+                                {(bookingData.startDate || bookingData.endDate) && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setBookingData({ startDate: '', endDate: '' })}
+                                        className="text-indigo-600 hover:text-indigo-800 transition active:scale-95 cursor-pointer font-black"
+                                    >
+                                        Clear Dates
+                                    </button>
+                                )}
                             </div>
                         </div>
 
