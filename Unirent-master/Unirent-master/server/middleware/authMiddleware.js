@@ -1,6 +1,6 @@
 const jwt = require('jwt-simple');
 const User = require('../models/User');
-const secret = process.env.JWT_SECRET || 'unirent_secret_key';
+const secret = process.env.JWT_SECRET;
 
 module.exports = async (req, res, next) => {
     try {

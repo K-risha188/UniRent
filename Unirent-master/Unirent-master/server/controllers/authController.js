@@ -3,8 +3,9 @@ const Booking = require('../models/Booking');
 const Review = require('../models/Review');
 const jwt = require('jwt-simple');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
-const secret = process.env.JWT_SECRET || 'unirent_secret_key';
+const secret = process.env.JWT_SECRET;
 
 exports.register = async (req, res) => {
     try {
@@ -77,14 +78,15 @@ exports.sendOtp = async (req, res) => {
             return res.status(400).json({ error: 'Please provide a valid phone number.' });
         }
 
-        // Generate 6-digit numeric OTP
-        const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+        // Generate 6-digit cryptographically secure numeric OTP
+        const otpCode = crypto.randomInt(100000, 999999).toString();
         const otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes validity
 
         // If phone is different from user's current phone, update it and reset verification
         const updateData = {
             phoneOtp: otpCode,
-            phoneOtpExpiry: otpExpiry
+            phoneOtpExpiry: otpExpiry,
+            otpAttempts: 0 // Reset security attempts counter on new OTP request
         };
         if (phone && phone !== req.user.phone) {
             updateData.phone = phone;
@@ -102,8 +104,7 @@ exports.sendOtp = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            message: 'OTP sent successfully! (Simulated)',
-            otp: otpCode // Returned for painless local development testing
+            message: 'OTP sent successfully! (Simulated)'
         });
     } catch (error) {
         res.status(400).json({ error: error.message });
@@ -124,6 +125,15 @@ exports.verifyOtp = async (req, res) => {
             return res.status(400).json({ error: 'No OTP requested or OTP has expired. Please request a new one.' });
         }
 
+        // Check if rate-limited beforehand
+        if ((user.otpAttempts || 0) >= 5) {
+            user.phoneOtp = null;
+            user.phoneOtpExpiry = null;
+            user.otpAttempts = 0;
+            await user.save();
+            return res.status(400).json({ error: 'Too many failed attempts. This OTP has been invalidated. Please request a new one.' });
+        }
+
         // Check expiry
         if (new Date() > new Date(user.phoneOtpExpiry)) {
             return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
@@ -131,13 +141,27 @@ exports.verifyOtp = async (req, res) => {
 
         // Verify match
         if (user.phoneOtp !== otp) {
-            return res.status(400).json({ error: 'Incorrect OTP. Please check the code and try again.' });
+            const currentAttempts = (user.otpAttempts || 0) + 1;
+            user.otpAttempts = currentAttempts;
+
+            if (currentAttempts >= 5) {
+                user.phoneOtp = null;
+                user.phoneOtpExpiry = null;
+                user.otpAttempts = 0;
+                await user.save();
+                return res.status(400).json({ error: 'Too many failed attempts. This OTP has been invalidated. Please request a new one.' });
+            } else {
+                await user.save();
+                const remaining = 5 - currentAttempts;
+                return res.status(400).json({ error: `Incorrect OTP. You have ${remaining} attempts remaining before this code is invalidated.` });
+            }
         }
 
         // OTP matched successfully! Mark verified.
         user.isPhoneVerified = true;
         user.phoneOtp = null;
         user.phoneOtpExpiry = null;
+        user.otpAttempts = 0; // Reset attempts counter on successful verification
         await user.save();
 
         // Strip password for response

@@ -6,6 +6,16 @@ const Transaction = require('../models/Transaction');
 
 exports.createBooking = async (req, res) => {
     try {
+        // Enforce phone OTP and Admin verification guards (Admins bypass these checks)
+        if (req.user.role !== 'admin') {
+            if (!req.user.isPhoneVerified) {
+                return res.status(403).json({ error: 'Please verify your phone number via OTP in your Profile before renting items.' });
+            }
+            if (!req.user.isVerified) {
+                return res.status(403).json({ error: 'Your student account is pending administrator verification. Please upload your student ID card in your Profile.' });
+            }
+        }
+
         const { itemId, startDate, endDate } = req.body;
 
         const item = await Item.findById(itemId);
@@ -410,6 +420,24 @@ exports.cancelBooking = async (req, res) => {
         });
 
         res.json({ message: 'Booking request cancelled successfully and funds fully refunded', booking });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+};
+
+exports.getReservedDates = async (req, res) => {
+    try {
+        const bookings = await Booking.find({
+            item: req.params.itemId,
+            status: { $in: ['approved', 'active', 'requested_return'] }
+        }).select('startDate endDate');
+        
+        const reservedRanges = bookings.map(b => ({
+            startDate: b.startDate,
+            endDate: b.endDate
+        }));
+        
+        res.json(reservedRanges);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
